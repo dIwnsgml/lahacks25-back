@@ -31,7 +31,21 @@ async function createJournalsTable() {
   `);
 }
 
+async function createMessagesTable() {
+  const connection = pool.promise();
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      message_id VARCHAR(10) NOT NULL PRIMARY KEY,
+      user_id VARCHAR(10),
+      journal_id VARCHAR(10),
+      message TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(user_id)
+    );
+  `);
+}
+
 module.exports = {
   createUsersTable,
   createJournalsTable,
+  createMessagesTable,
 };

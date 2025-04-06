@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 
-function generateRandomId(length) {
+function generateRandomId(length = 10) {
   const characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
