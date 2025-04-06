@@ -26,6 +26,7 @@ async function createJournalsTable() {
       contents TEXT,
       created_at INT(10) NOT NULL,
       user_id VARCHAR(10),
+      mood_score INT DEFAULT 50,
       FOREIGN KEY (user_id) REFERENCES users(user_id)
     );
   `);
@@ -39,6 +40,7 @@ async function createMessagesTable() {
       user_id VARCHAR(10),
       journal_id VARCHAR(10),
       message TEXT NOT NULL,
+      sent_at INT(10) NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(user_id)
     );
   `);

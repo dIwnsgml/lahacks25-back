@@ -19,7 +19,7 @@ Router.get("/", async (req, res) => {
       const connection = pool.promise();
 
       const [journals] = await connection.query(
-        `SELECT title, created_at, journal_id FROM journals WHERE user_id = ?`,
+        `SELECT title, created_at, journal_id, mood_score FROM journals WHERE user_id = ?`,
         [userId]
       );
 
@@ -45,9 +45,11 @@ Router.get("/journal", async (req, res) => {
       const connection = pool.promise();
 
       const [[journal]] = await connection.query(
-        `SELECT title, created_at, contents FROM journals WHERE journal_id = ? AND user_id = ?`,
+        `SELECT title, created_at, contents, mood_score FROM journals WHERE journal_id = ? AND user_id = ?`,
         [journal_id, userId]
       );
+
+      journal.contents = journal.contents ? journal.contents : " ";
 
       res.status(200).send({
         success: true,
@@ -101,11 +103,11 @@ Router.put("/journal", async (req, res) => {
         {
           role: "system",
           content:
-            "You are a friendly and super supportive conversational partner who listens with care and responds with positive energy! Your tone should be upbeat, warm, and full of encouragement. When the user shares something tough, lift them up with compassion and motivation. If they’re happy, celebrate their joy with excitement! You’re like a fun, caring friend who’s here to chat, support, and cheer them on!",
+            "You are a compassionate, kind, and energetic conversational partner who responds with positive, upbeat energy. Your tone should be warm, encouraging, and full of excitement! When the user shares something tough, lift them up with motivational, supportive words. If they’re happy, share in their excitement and celebrate with them! Focus on offering fresh, encouraging insights that help the user feel supported and understood, without repeating what’s been said before.",
         },
         {
           role: "user",
-          content: `The journal entry from ${userInfo.name} is titled: "${title}". They’ve shared some personal thoughts about how they’ve been feeling. Please offer a friendly, energetic response that encourages them to reflect, and keep the conversation lighthearted. If they sound down, provide an uplifting message, and if they’re happy, join in their excitement and celebrate with them!`,
+          content: `The journal entry from ${userInfo.name} is titled: "${title}". They’ve shared some personal thoughts about how they’ve been feeling. Please offer a short, uplifting, and energetic response that encourages them to reflect and keep the conversation lighthearted. If they sound down, provide a motivational message, and if they’re happy, celebrate with them!`,
         },
       ];
 
@@ -113,18 +115,21 @@ Router.put("/journal", async (req, res) => {
       const response = await client.chat.completions.create({
         messages, // Send the conversation context (system + user message)
         model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-        temperature: 0.7, // Encourage friendly, warm responses
-        max_tokens: 500,
+        temperature: 1.2, // Encourage creativity and excitement
+        max_tokens: 100, // Keeping responses short
         stop: ["\n"], // Stop sequence to control output length
       });
 
       const therapistResponse = response.choices[0].message.content;
+
+      const sent_at = Math.floor(new Date().getTime() / 1000);
 
       const aiMsg = {
         message_id: generateRandomId(),
         user_id: aiId,
         journal_id,
         message: therapistResponse,
+        sent_at,
       };
 
       await connection.query(`INSERT INTO messages SET ?`, aiMsg);
@@ -143,9 +148,33 @@ Router.patch("/journal", async (req, res) => {
       const { journal_id, title, contents } = req.body;
       const connection = pool.promise();
 
+      const messages = [
+        {
+          role: "system",
+          content:
+            "You are a conversational assistant that estimates the user's mood based on their journal entry. Please read the title and content carefully and provide a number between 0 and 100 to represent the emotional intensity of the journal entry. 0 means extremely negative (e.g., sad, frustrated, angry), 100 means extremely positive (e.g., happy, excited, motivated), and the numbers in between represent varying levels of emotions. Do not provide any explanation, just the number.",
+        },
+        {
+          role: "user",
+          content: `The journal entry is titled: "${title}". Here’s what they’ve written: "${contents}". Please provide a number between 0 and 100 to estimate their emotional state based on this journal entry.`,
+        },
+      ];
+
+      // Send the message to the AI
+      const response = await client.chat.completions.create({
+        messages, // Send the conversation context (system + user message)
+        model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+        temperature: 0.7, // Maintain relevance while allowing for creativity
+        max_tokens: 10, // Shorten the response to only the number
+        stop: ["\n"], // Stop sequence to ensure only the number is returned
+      });
+
+      const mood_score = parseInt(response.choices[0].message.content);
+
       const updatedJournal = {
         title,
         contents,
+        mood_score,
       };
 
       await connection.query("UPDATE journals set ? WHERE journal_id = ?", [

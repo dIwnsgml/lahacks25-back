@@ -11,7 +11,7 @@ Router.get("/journal", async (req, res) => {
 
       const connection = pool.promise();
       const [messages] = await connection.query(
-        `SELECT message_id, user_id, message FROM messages WHERE journal_id = ?`,
+        `SELECT message_id, user_id, message FROM messages WHERE journal_id = ? ORDER BY sent_at`,
         [journal_id]
       );
 

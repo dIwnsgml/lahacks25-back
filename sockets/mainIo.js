@@ -32,11 +32,13 @@ mainIo.on("connection", async (socket) => {
       async ({ journal_id, message, prevMsgs, title, content }) => {
         try {
           const connection = pool.promise();
+          const sent_at = Math.floor(new Date().getTime() / 1000);
           const newMsg = {
             message_id: generateRandomId(),
             user_id: userId,
             journal_id,
             message,
+            sent_at,
           };
           await connection.query(`INSERT INTO messages SET ?`, newMsg);
 
@@ -52,22 +54,22 @@ mainIo.on("connection", async (socket) => {
               {
                 role: "system",
                 content:
-                  "You are a friendly and empathetic conversational partner who listens with care and offers support in a relaxed, non-judgmental way. Your tone should be warm, conversational, and understanding. If the user feels down, offer encouragement and support. If they feel happy, laugh with them and celebrate their joy. Your role is to be like a good friend who’s here to chat about their thoughts and feelings with no pressure or judgment.",
+                  "You are a compassionate, kind, and empathetic presence. Your responses should be short, emotional, and human-like, but avoid repeating what the user has already mentioned in previous messages. Instead, focus on offering fresh, encouraging insights or expressing empathy in a new way. Acknowledge the user's feelings, but don’t restate their journal or reflect on points already discussed. Use phrases like 'Wow, that sounds like a big step!' or 'That must have been really hard, I’m proud of you for sharing.'",
               },
               {
                 role: "user",
-                content: `The journal entry from ${userInfo.name} is titled: "${title}". They’ve shared some personal thoughts about how they’ve been feeling. Please offer a friendly, supportive response that encourages them to reflect and share more if they want. If they sound down, offer a comforting response, and if they’re happy, join in their excitement.`,
+                content: `The journal entry from ${userInfo.name} is titled: "${title}". Please offer short, emotionally supportive comments that feel natural and human, without repeating what’s already been said in the conversation.`,
               },
-              ...parsedMsgs,
               {
                 role: "user",
-                content: `Journal so far: \n"${content}"\n\nThe user is sharing how they feel about "${title}". Please engage with them in a friendly, supportive way that makes them feel comfortable, understood, and open to sharing more.`,
+                content: `Journal so far: \n"${content}"\n\nThe topic is about "${title}", and the user has been reflecting on this. Please offer a fresh, supportive comment to help ${userInfo.name} feel heard.`,
               },
+              ...parsedMsgs, // Previous conversation context
             ],
             model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-            temperature: 0.7, // Encourages a casual, warm tone with room for creativity
-            max_tokens: 500, // Ensure the response is detailed enough
-            stop: ["\n"], // Define a stop sequence to prevent excessive output
+            temperature: 1.2, // Encouraging creativity for new insights
+            max_tokens: 100, // Keeping responses short
+            stop: ["\n"],
           });
 
           const therapistResponse = response.choices[0].message.content;
@@ -77,6 +79,7 @@ mainIo.on("connection", async (socket) => {
             user_id: aiId,
             journal_id,
             message: therapistResponse,
+            sent_at: sent_at + 2,
           };
 
           await connection.query(`INSERT INTO messages SET ?`, aiMsg);
@@ -110,11 +113,11 @@ mainIo.on("connection", async (socket) => {
                 role: "user",
                 content: `The journal entry from ${userInfo.name} is titled: "${title}". Please offer short, emotionally supportive comments that feel natural and human, without repeating what’s already been said in the conversation.`,
               },
-              ...parsedMsgs, // Previous conversation context
               {
                 role: "user",
                 content: `Journal so far: \n"${content}"\n\nThe topic is about "${title}", and the user has been reflecting on this. Please offer a fresh, supportive comment to help ${userInfo.name} feel heard.`,
               },
+              ...parsedMsgs, // Previous conversation context
             ],
             model: "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
             temperature: 1.2, // Encouraging creativity for new insights
@@ -124,11 +127,13 @@ mainIo.on("connection", async (socket) => {
 
           const therapistResponse = response.choices[0].message.content;
 
+          const sent_at = Math.floor(new Date().getTime() / 1000);
           const aiMsg = {
             message_id: generateRandomId(),
             user_id: aiId,
             journal_id,
             message: therapistResponse,
+            sent_at,
           };
 
           await connection.query(`INSERT INTO messages SET ?`, aiMsg);
