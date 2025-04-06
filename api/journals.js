@@ -19,7 +19,7 @@ Router.get("/", async (req, res) => {
       const connection = pool.promise();
 
       const [journals] = await connection.query(
-        `SELECT title, created_at, journal_id, mood_score FROM journals WHERE user_id = ?`,
+        `SELECT title, created_at, journal_id, mood_score, contents FROM journals WHERE user_id = ?`,
         [userId]
       );
 
